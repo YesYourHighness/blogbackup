@@ -3,8 +3,7 @@ title: MySQL-3
 date: 2019-08-31 21:46:47
 tags: 
 - MySQL
-categories: 
-- 后台
+categories:
 - MySQL
 ---
 

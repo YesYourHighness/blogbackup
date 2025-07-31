@@ -4,13 +4,12 @@ date: 2020-08-22 16:33:39
 tags:
 - CORS
 categories:
-- 其他
+- 计算机网络
 ---
 
 <center>
 引言：HTTP访问控制，CORS跨域资源分享；什么是跨域，以及预检请求等
 </center>
-
 <!-- more -->
 
 # HTTP访问控制

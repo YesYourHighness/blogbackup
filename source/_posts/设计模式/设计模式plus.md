@@ -318,13 +318,47 @@ public class MultiCaseMode2 {
 
 ## 工厂模式
 
-### 简单工厂模式
+> 工厂模式：实现了创建者和调用者的分离
 
-		开发中经常使用，如果涉及到两个类之间的转换，比方说要通过A类的大部分成员去生成一个新类B，这时候一般不会在逻辑中进行一堆的`set`操作，而是将生成的逻辑写在A中，直接通过`A.getB(param)`获得B类
+普通的对象，我们可以直接`new`来创建，但是当创建的操作比较复杂时，就会考虑使用工厂模式，将创建者和调用者分离，简化调用者的操作。
+
+普通的方式：
+
+```java
+// 张三开五菱去上班
+Car car = new Wulin();
+zhangSan.drive(car);
+// 后来张三996挣钱了，换成了宝马车
+Car car = new BMW();
+zhangSan.dirve(car);
+// 再后来张三30岁了，被裁员，只能骑共享单车了
+Car car = new HaLuo();
+zhangSan.dirve(car);
+```
+
+### 简单工厂模式（静态工厂模式）
+
+简单工厂就是提供一个静态方法，直接返回对象实例。
+
+使用简单工厂方式是这样的：
+
+```java
+zhangSan.drive(CarFactory.getCar("别克"));
+```
+
+```java
+public class CarFactory{
+    public static Car getCar(String carName){
+        if(carName == "BMW"){
+            return new BMW;
+        }else if(...){
+            ...
+        }
+	}
+}
+```
 
 ### 工厂模式
-
-> 开发中如何确定选择简单工厂模式还是工厂模式？
 
 原则：当**创建逻辑比较复杂**的时候使用工厂模式，其余使用简单工厂模式即可
 
@@ -333,310 +367,59 @@ public class MultiCaseMode2 {
 1. 涉及到对不同的类型，创建了不同的对象（往往有很多个`if-else`嵌套）
 2. 创建涉及到很多个对象
 
-### 使用工厂模式实现一个简单的IOC
+工厂模式相比于简单工厂，就是定义了详细的接口，更加规范：
 
-IOC就是Spring的核心思想之一，作为容器，创建我们所需要的类；
+- 产品接口
+- 产品实现接口
+- 工厂接口
+- 工厂实现接口
 
-> 工厂模式与IOC的区别是什么？
-
--  IOC其实就是一个大的工厂类，只不过**工厂类是创建某个类**，而**IOC可以创建整个应用中你想让其创建的类**。
--  简单来说，`IOC = 配置文件 + 工厂模式 + 反射`
-
----
-
-IOC的核心功能有三个：
-
-- 配置解析
-- 对象创建
-- 对象生命周期管理
-
-此处实现的IOC只涉及一些简单的逻辑：
-
-1、启动类及两个简单的实体类
+对应的接口都需要有实现类，比如下面的例子：
 
 ```java
-public class Main {
-    public static void main(String[] args) {
-        MyApplicationContext context = new MyClassPathXmlApplicationContext("beans.xml");
-        A a = (A) context.getBean("A");
-        System.out.println(a);
-    }
-}
-
-public class A {
-    private B b;
-
-    public A() {}
-
-    public A(B b) {
-        this.b = b;
-    }
-    // 省去get、set方法
-
-public class B {
-    private String name;
-    private Integer age;
-
-    public B() {}
-
-    public B(String name, Integer age) {
-        this.name = name;
-        this.age = age;
-    }
-    // 省去get、set方法
+public static void main(String[] args) {
+    TruckCarFactory factory = new TruckCarFactory();
+    Car car = factory.createCar();
+    car.fire();
+    car.stop();
 }
 ```
 
-2、`MyApplicationContext`及其实现类
+产品接口及其产品实现接口：
 
 ```java
-public interface MyApplicationContext {
-    Object getBean(String beanId);
+public interface Car {
+    public void fire();
+    public void stop();
 }
 
-public class MyClassPathXmlApplicationContext implements MyApplicationContext {
-
-    private MyBeansFactory myBeansFactory;
-    private MyBeanConfigParser myBeanConfigParser;
-
-    public MyClassPathXmlApplicationContext(String configLocation) {
-        this.myBeansFactory = new MyBeansFactory();
-        this.myBeanConfigParser = new MyXmlBeanConfigParser();
-        loadBeanDefinitions(configLocation);
-    }
-
-    private void loadBeanDefinitions(String configLocation) {
-        InputStream in = null;
-        try {
-            in = this.getClass().getResourceAsStream("/" + configLocation);
-            if (in == null) {
-                throw new RuntimeException("Can not find config file: " + configLocation);
-            }
-            List<MyBeanDefinition> beanDefinitions = myBeanConfigParser.parse(in);
-            myBeansFactory.addBeanDefinitions(beanDefinitions);
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-
+public class TruckCar implements Car{
     @Override
-    public Object getBean(String beanId) {
-        return myBeansFactory.getBean(beanId);
-    }
-}
-```
-
-3、定义类与枚举类等辅助类
-
-```java
-public class MyBeanDefinition {
-    private String id;
-    private String className; // 类的全限定名
-    private List<MyConstructorArg> constructorArgList = new ArrayList<>();
-    private MyScope scope = MyScope.SINGLETON;
-    private boolean lazyInit = false; // 延迟加载
-    // 省去get、set方法
-}
-public class MyConstructorArg {
-    private boolean isRef; // 是否是引用其他类
-    private Class type;
-    private Object arg;
-    // 省去get、set方法
-}
-public enum MyScope {
-    SINGLETON, // 表示单例模式
-    PROTOTYPE; // 表示原型模式
-}
-```
-
-4、解析类（此处的解析类某处是设死值，这不是核心，只是为了让前后能跑起来，核心是下面的工厂类，可以跳过）
-
-```java
-public interface MyBeanConfigParser {
-    List<MyBeanDefinition> parse(InputStream in);
-    List<MyBeanDefinition> parse(NodeList configContent);
-}
-public class MyXmlBeanConfigParser implements MyBeanConfigParser {
-    @Override
-    public List<MyBeanDefinition> parse(InputStream in) {
-        // DOM方式解析xml文件
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-        NodeList beanList = null;
-        try {
-            DocumentBuilder db = dbf.newDocumentBuilder();
-            Document doc = db.parse(in);
-            beanList = doc.getElementsByTagName("bean");
-            System.out.println("该xml文件有：" + beanList.getLength() + "个bean");
-        } catch (SAXException | IOException | ParserConfigurationException e) {
-            e.printStackTrace();
-        }
-        return parse(beanList);
+    public void fire() {
     }
 
     @Override
-    public List<MyBeanDefinition> parse(NodeList beanList) {
-        if(beanList == null){
-            throw new RuntimeException("the resolve result is null");
-        }
-        List<MyBeanDefinition> beanDefinitions = new ArrayList<>();
-        for (int i = 0; i < beanList.getLength(); i++) {
-            Node item = beanList.item(i);
-            addToList(beanDefinitions, item);
-        }
-        System.out.println(beanDefinitions);
-        return beanDefinitions;
-    }
-
-    private void addToList(List<MyBeanDefinition> beanDefList, Node node) {
-        NamedNodeMap map = node.getAttributes();
-        MyBeanDefinition def = new MyBeanDefinition();
-
-        // 属性设置
-        Node id = map.getNamedItem("id");
-        Node classPath = map.getNamedItem("class");
-        Node scope = map.getNamedItem("scope");
-        Node lazyInit = map.getNamedItem("lazy-init");
-        if(id == null || classPath == null){
-            throw new RuntimeException("bean has no Id or ClassPath");
-        }
-        def.setId(id.getNodeValue());
-        def.setClassName(classPath.getNodeValue());
-        if(scope != null){
-            String value = scope.getNodeValue();
-            if(value.equalsIgnoreCase(MyScope.SINGLETON.name())){
-                def.setScope(MyScope.SINGLETON);
-            }else if(value.equalsIgnoreCase(MyScope.PROTOTYPE.name())){
-                def.setScope(MyScope.PROTOTYPE);
-            }else {
-                throw new RuntimeException("bean scope has error");
-            }
-        }
-        if(lazyInit != null){
-            def.setLazyInit(new Boolean(lazyInit.getNodeValue()));
-        }
-
-        // 构造器设置
-        NodeList childNodes = node.getChildNodes();
-        List<MyConstructorArg> constructorArgList = new ArrayList<>();
-        for (int i = 0; i < childNodes.getLength(); i++) {
-            Node item = childNodes.item(i);
-            if("#text".equals(item.getNodeName()) ){
-                // 换行+空格视为一个文本节点
-                continue;
-            }
-            NamedNodeMap childMap = item.getAttributes();
-            Node ref = childMap.getNamedItem("ref");
-            Node type = childMap.getNamedItem("type");
-            Node value = childMap.getNamedItem("value");
-            MyConstructorArg myConstructorArg = new MyConstructorArg();
-            if(ref != null){
-                myConstructorArg.setRef(true);
-                myConstructorArg.setType(B.class);
-                myConstructorArg.setArg("B");
-            }
-            if(type != null){
-                if("String".equalsIgnoreCase(type.getNodeValue())){
-                    myConstructorArg.setType(String.class);
-                    myConstructorArg.setArg(value.getNodeValue());
-                }
-                if("Integer".equalsIgnoreCase(type.getNodeValue())){
-                    myConstructorArg.setType(Integer.class);
-                    myConstructorArg.setArg(Integer.valueOf(value.getNodeValue()));
-                }
-            }
-            constructorArgList.add(myConstructorArg);
-        }
-        def.setConstructorArgList(constructorArgList);
-
-        beanDefList.add(def);
+    public void stop() {
     }
 }
 ```
 
-5、工厂类（核心）
+工厂接口及其工厂实现接口：
 
 ```java
-public class MyBeansFactory {
+public interface CarFactory {
+    Car createCar();
+}
 
-    private ConcurrentHashMap<String, Object> singletonObjects = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<String, MyBeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>();
-
-
-    public void addBeanDefinitions(List<MyBeanDefinition> beanDefinitionList) {
-        for (MyBeanDefinition definition : beanDefinitionList) {
-            this.beanDefinitionMap.putIfAbsent(definition.getId(), definition);
-        }
-        for (MyBeanDefinition definition : beanDefinitionList) {
-            if (!definition.isLazyInit() && definition.getScope().equals(MyScope.SINGLETON)) {
-                // 如果非懒加载且不是单例模式
-                createBean(definition);
-            }
-        }
-    }
-
-
-    public Object getBean(String beanId) {
-        MyBeanDefinition beanDefinition = beanDefinitionMap.get(beanId);
-        if (beanDefinition == null) {
-            throw new NoSuchBeanDefinitionException("Bean is not defined: " + beanId);
-        }
-        return createBean(beanDefinition);
-    }
-
-    private Object createBean(MyBeanDefinition definition) {
-        if (definition.getScope().equals(MyScope.SINGLETON) && singletonObjects.contains(definition)) {
-            // 如果是单例且单例map还有此key
-            return singletonObjects.get(definition.getId());
-        }
-        Object bean = null;
-        try {
-            Class<?> beanClass = Class.forName(definition.getClassName());
-            List<MyConstructorArg> args = definition.getConstructorArgList();
-            if (args.isEmpty()) {
-                bean = beanClass.newInstance();
-            } else {
-                Class<?>[] argClass = new Class[args.size()];
-                Object[] argObjects = new Object[args.size()];
-                for (int i = 0; i < args.size(); i++) {
-                    MyConstructorArg arg = args.get(i);
-                    if (!arg.isRef()) {
-                        // 非引用类型
-                        argClass[i] = arg.getType();
-                        argObjects[i] = arg.getArg();
-                    } else {
-                        // 引用类型
-                        MyBeanDefinition refBeanDefinition = beanDefinitionMap.get(arg.getArg().toString());
-                        if (refBeanDefinition == null) {
-                            throw new NoSuchBeanDefinitionException("Bean is not defined");
-                        }
-                        argClass[i] = Class.forName(refBeanDefinition.getClassName());
-                        argObjects[i] = createBean(refBeanDefinition);
-                    }
-                }
-                bean = beanClass.getConstructor(argClass).newInstance(argObjects);
-            }
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
-            e.printStackTrace();
-        }
-        if (bean != null && definition.getScope().equals(MyScope.SINGLETON)) {
-            singletonObjects.putIfAbsent(definition.getId(), bean);
-            return singletonObjects.get(definition.getId());
-        }
-        return bean;
+public class TruckCarFactory implements CarFactory{
+    @Override
+    public Car createCar() {
+        return new TruckCar();
     }
 }
 ```
 
 ## 建造者模式
-
-### 建造者模式
 
 > 建造者模式解决什么问题？
 
@@ -659,69 +442,52 @@ public class MyBeansFactory {
 
    建造者模式可以避免处于无效状态的对象被别的地方使用导致出错。
 
-例如这个例子，一个资源池：
+例如这个例子:
 
 ```java
-public class ResourcePoolConfig {
-    private static final int DEFAULT_MAX_TOTAL = 8;
-    private static final int DEFAULT_MAX_IDLE = 8;
-    private static final int DEFAULT_MIN_IDLE = 0;
+public class Rectangle {
+    private int length;
+    private int width;
 
-    /**
-     * 四个成员变量： name是必配项，其余三个为可选项
-     * 因此一般的设计为构造函数传递name，其余的参数使用set传
-     */
-
-    private String name;
-    private int maxTotal = DEFAULT_MAX_TOTAL;
-    private int maxIdle = DEFAULT_MAX_IDLE;
-    private int minIdle = DEFAULT_MIN_IDLE;
-
-    public ResourcePoolConfig(String name) {
-        this.name = name;
-    }
-    // 省去get、set方法
-}
-```
-
-发现`maxIdle`一定要大于等于`minIdle`，这样参数之间存在逻辑，我们就可以使用建造者模式
-
-```java
-public class ResourcePoolConfigV2 {
-    private String name;
-    private int maxTotal;
-    private int maxIdle;
-    private int minIdle;
-
-    public ResourcePoolConfigV2(Builder builder) {
-        this.name = builder.name;
-        this.maxTotal = builder.maxTotal;
-        this.maxIdle = builder.maxIdle;
-        this.minIdle = builder.minIdle;
+    public Rectangle(int length, int width) {
+        this.length = length;
+        this.width = width;
     }
 
-    public static class Builder{
-        private static final int DEFAULT_MAX_TOTAL = 8;
-        private static final int DEFAULT_MAX_IDLE = 8;
-        private static final int DEFAULT_MIN_IDLE = 0;
+    static class Builder{
+        // 给默认值
+        private int length = 2;
+        private int width = 1;
 
-        private String name;
-        private int maxTotal = DEFAULT_MAX_TOTAL;
-        private int maxIdle = DEFAULT_MAX_IDLE;
-        private int minIdle = DEFAULT_MIN_IDLE;
-
-        public Builder(String name) {
-            // 校验逻辑
-            if("".equals(name)){
-                throw new IllegalArgumentException();
-            }
-            this.name = name;
+        public Rectangle.Builder length(int length) {
+            this.length = length;
+            return this;
         }
-        // 省去get set方法
+        public Rectangle.Builder width(int length) {
+            this.length = length;
+            return this;
+        }
+        public Rectangle build(){
+            // 加判断逻辑，防止无效状态
+            if(length <= 0 || width <= 0){
+                throw new IllegalArgumentException("Wrong length or width");
+            }
+            return new Rectangle(this.length, this.width);
+        }
     }
 }
-
 ```
+
+如果我们要创建一个长方形：
+
+```java
+public static void main(String[] args) {
+    Rectangle.Builder builder = new Rectangle.Builder();
+    Rectangle rec = builder.length(10).width(10).build();
+}
+```
+
+这样，即使是我们给的长给了负数，在最后`build()`时，也会抛出异常，这样就避免了无效状态。
 
 > 建造者模式的缺点
 
@@ -729,7 +495,9 @@ public class ResourcePoolConfigV2 {
 
 > 建造者模式与工厂模式的区别
 
-生活的例子：顾客走进一家餐馆点餐，我们利用工厂模式，根据用户不同的选择，来制作不同的食物，比如披萨、汉堡、沙拉。对于披萨来说，用户又有各种配料可以定制，比如奶酪、西红柿、起司，我们通过建造者模式根据用户选择的不同配料来制作披萨
+生活的例子：顾客走进一家餐馆点餐，我们利用工厂模式，根据用户不同的选择，来制作不同的食物，比如披萨、汉堡、沙拉。
+
+对于披萨来说，用户又有各种配料可以定制，比如奶酪、西红柿、起司，我们通过建造者模式根据用户选择的不同配料来制作披萨
 
 - 工厂模式：创建不同但是相关类型的对象
 - 建造者模式：创建一种逻辑复杂的对象
@@ -740,7 +508,62 @@ public class ResourcePoolConfigV2 {
 
 ## 原型模式
 
+> 原型模式：利用对已有对象（原型）进行复制（或者叫拷贝）的方式，来创建新对象，以达到节省创建时间的目的。
 
+原型模式有两种实现方法：
+
+- **深拷贝**：一份完完全全独立的对象
+- **浅拷贝**：复制对象中基本数据类型数据和**引用对象的内存地址**，不会递归地复制引用对象，以及引用对象的引用对象
+
+可以通过改写`clone`方法来实现原型模式：
+
+1. 继承`Cloneable`接口
+2. 重写`clone`方法
+
+```java
+@Data
+public class User implements Cloneable{
+    private String name;
+    private ArrayList list;
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        return super.clone(); // 浅拷贝
+    }
+}
+
+public class Test {
+    public static void main(String[] args) throws CloneNotSupportedException {
+        User fengQiang = new User();
+        fengQiang.setName("小明");
+        ArrayList<Integer> list = new ArrayList<>();
+        list.add(1);
+        fengQiang.setList(list);
+        // 克隆一份，然后使用克隆的再添加一个元素
+        User clone = (User)fengQiang.clone();
+        clone.getList().add(2);
+
+        System.out.println(fengQiang);
+        System.out.println(clone);
+    }
+}
+// 输出结果为：
+//User(name=小明, list=[1, 2])
+//User(name=小明, list=[1, 2])
+```
+
+浅拷贝，两个对象地址一样
+
+改写`clone`为深拷贝
+
+```java
+@Override
+protected Object clone() throws CloneNotSupportedException {
+    User clone = (User) super.clone();
+    clone.setList((ArrayList) clone.list.clone());
+    return clone;
+}
+```
 
 # 结构型
 
@@ -748,16 +571,143 @@ public class ResourcePoolConfigV2 {
 
 ## 代理模式
 
+> 代理模式在不改变原始类接口的条件下，为原始类定义一个代理类，主要目的是**控制访问**，而非加强功能，这是它跟装饰器模式最大的不同
+
+代理模式常用在业务系统中开发一些**非功能性需求**，比如：监控、统计、鉴权、限流、事务、幂等、日志。
+
+分为：
+
+- 静态代理
+- 动态代理
+
+### 静态代理模式
+
+静态代理模式中有 **真实对象、代理对象**
+
+- 真实对象与代理对象要**实现同一个接口**
+- 代理对象要**代理真实的角色**
+
+优点：
+
+- 静态代理模式可以帮助我们处理一些其他的事情，**真实对象可以专注于做本职任务**
+- 如果业务发生扩展，方便集中管理
+
+例如：租客与房东之间，租客需要一个中介（代理对象），中介负责去找房东（真实对象）
+
+在Java中，`Thread`就是一个静态代理的例子，**自定义`Thread`类**要实现`Runnable`接口，而`Thread`类也实现了`Runnable`接口，此时**自定义`Thread`类**就是真实对象，而`Thread`类就是代理对象
+
+除此外，在RPC（远程方法调用）中，客户端与服务端连接，具体的连接过程都由一个代理类来完成，这也是代理模式
+
+### 动态代理
+
+静态代理模式还存在一些问题，需要给每一个类都创建一个代理类，工作量直接翻倍
+
+对于这种情况就出现了**动态代理**
+
+> 其他概念与静态代理相同，只不过代理类是动态生成的，而不是我们直接写好的
+
+- 基于接口的动态代理：JDK Proxy
+
+- 基于类的动态代理：CGLIB
+- 字节码实现：Javasist（不是重点，实现在JBoss服务器）
+
+#### JDK Proxy
+
+此动态代理模式用到两个类：`Proxy`与`InvocationHandler`
+
+Proxy主要了解此方法`newProxyInstance`：
+
+```java
+public static Object newProxyInstance(ClassLoader loader,// 类加载器， 通常会选择使用动态代理类本身的类加载器
+                                      Class<?>[] interfaces,// 通过真实对象可以获取到它所实现的所有接口
+                                      InvocationHandler h// 实现动态代理的类本身
+                                     )
+```
+
+InvocationHandler是一个接口，他有一个方法：
+
+```java
+Object invoke(Object proxy,// 生成的代理对象
+              Method method,// 调用的方法
+              Object[] args)// 方法的参数
+       throws Throwable
+```
+
+在JDK动态代理中，**真实对象必须实现接口**，代理对象才可以对其进行代理，原理如下面这个demo：
+
+```java
+// 接口；在静态代理中，这个就是我们要实现的业务，代理与真实对象都要实现
+public interface UserService {
+    public void sayHi();
+}
+// 真实对象
+public class UserServiceImpl implements UserService {
+    @Override
+    public void sayHi() {
+        System.out.println("hi");
+    }
+}
+// 动态代理生成处理器
+public class ProxyInvocationHandler implements InvocationHandler {
+    private Object target;
+
+    public void setTarget(Object target) {
+        this.target = target;
+    }
+
+    // 获得代理类
+    public Object getProxy(){
+        return Proxy.newProxyInstance(
+                this.getClass().getClassLoader(),
+                target.getClass().getInterfaces(),// 这个参数注意！其必须要有实现接口
+                this
+        );
+    }
+
+    @Override
+    // 处理代理实例，返回对象
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        System.out.println("其他操作...");// 可以进行其他操作，比如记录日志等等
+        Object invoke = method.invoke(target, args);// 实现真实对象想要实现的功能
+        System.out.println("其他操作...");
+        return invoke;
+    }
+}
+public class Test {
+    public static void main(String[] args) {
+        UserServiceImpl impl = new UserServiceImpl();
+        // 创建代理对象
+        ProxyInvocationHandler pih = new ProxyInvocationHandler();
+        pih.setTarget(impl);
+        UserService proxy = (UserService) pih.getProxy();
+        // 代理对象通过invoke调用方法
+        proxy.sayHi();
+    }
+}
+```
+
+运行结果：
+
+```
+其他操作...
+hi
+其他操作...
+```
+
+这也是Spring AOP的实现原理
+
+#### CGLib
+
+JDK动态代理中，被代理的对象必须实现接口，而CGlib就不需要
+
 ## 桥接模式
 
-简单的设计模式，实际中并不常用
+> 什么是桥接模式？
+>
+> **抽象部分与实现部分解耦**，可以理解为接口与实现类都属于桥接模式
 
-> 什么是桥接模式
-
-- 抽象和实现解耦：
-  - 比如JDBC与Mysql、Oracle具体的Driver实现
-  - 也可以理解为log4j规范与Slf4j具体实现的关系
-- 组合优于继承
+- **抽象和实现解耦**
+- **组合优于继承**
 
 ## 装饰者模式
 
@@ -815,7 +765,7 @@ while (bs.read() != -1){
 
 > 为什么此处使用装饰者模式？
 
-		如果我们想实现缓冲区、读取单个基本类型的字节等等这样的功能，如果直接在父类`InputStream`类实现这个功能，那么会导致其所有子类都会有这个功能，这非我本意
+如果我们想实现缓冲区、读取单个基本类型的字节等等这样的功能，如果直接在父类`InputStream`类实现这个功能，那么会导致其所有子类都会有这个功能，这非我本意
 
 > 为什么需要有一个中间类`FilterInputStream`，而不是直接使用`BufferedInputStream`继承`InputStream`？（此处比较难理解）
 
@@ -837,7 +787,7 @@ public class BufferedInputStream extends InputStream {
 
 ```
 
-		同理，对于`DataInputStream`，我们也需要这样实现一遍，代码冗余度很高，因此抽出来`FilterInputStream`这个方法
+同理，对于`DataInputStream`，我们也需要这样实现一遍，代码冗余度很高，因此抽出来`FilterInputStream`这个方法
 
 因此如果看JDK源码就是这样：
 
@@ -1058,7 +1008,7 @@ public class ChessPiece {
 
 > 观察者模式：
 >
-> 		定义了对象之间的**一对多依赖**（`主题:观察者=1:n`），这样一来，当一个对象改变状态时，它的所有依赖者都会收到通知并自动更新
+> 定义了对象之间的**一对多依赖**（`主题:观察者=1:n`），这样一来，当一个对象改变状态时，它的所有依赖者都会收到通知并自动更新
 
 ### Java中的观察者模式
 

@@ -22,11 +22,7 @@ categories:
 
 # 手写简单的`Array`
 
-一个简单的Array我们需要什么功能？
-
-![image](https://github.com/YesYourHighness/MyPicStore/raw/master/dataStruct/array.png)
-
-看代码不要着急，慢慢看完，重要的地方都有注释
+重要的地方都有注释
 
 代码如下：
 
@@ -317,8 +313,6 @@ public class Array<E>{
 ```
 
 # 复杂度分析
-![image](https://github.com/YesYourHighness/MyPicStore/raw/master/dataStruct/array.png)
-
 回看我们所写的方法，我们来分析他们的时间复杂度
 
 ## 增

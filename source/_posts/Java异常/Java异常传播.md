@@ -1,21 +1,20 @@
 ---
 title: Java异常传播
-date: 2020-02-27 23:19:41
+date: 2022-02-27 23:19:41
 tags: 
 - Java异常
 categories: 
 - Java
 ---
 
-
 <center>
-    引言：Java异常的传播
+    引言：Java异常的传播机制。如何善用try、catch、finally？
 </center>
 
 <!--more-->
 
 
-# 异常的传播
+# Java异常的传播机制
 本文不再讲解异常的基本知识点，进入更深层的异常学习，有关基础可以看[博客](https://yesyourhighness.github.io/2019/08/17/Java/Java-%E5%BC%82%E5%B8%B8/)
 
 
@@ -97,22 +96,22 @@ public class TempTest {
 
 ```
 分析一下：
-1. `main`调用`process2`
+1. `main`调用`process1`
+1. `process1`调用`process2`
 2. `process2`抛出`NullPointerException`
-3. `catch`捕获异常
-4. `catch`抛出`IllegalArgumentException`
+3. `catch`捕获异常`NullPointerException`
+4. `process1`抛出`IllegalArgumentException`
 
-运行如下
+运行后的异常栈类似下面：
 ```
 java.lang.IllegalArgumentException
 	at TempTest.process1(TempTest.java:19)
 	at TempTest.main(TempTest.java:9)
 ```
-发现，打印结果中只有`IllegalArgumentException`，看不到`NullPointerException`
+**发现**：打印结果中只有`IllegalArgumentException`，看不到`NullPointerException`，**异常丢失了原始的异常信息**
 
-我们发现异常丢失了原始的异常信息
+如果开发中出现这种问题，我们将无法定位原始的异常位置，该怎么办呢？
 
-怎么办呢？
 ```java
 public class TempTest {
     public static void main(String[] args) {
@@ -185,8 +184,7 @@ Caused by: java.lang.NumberFormatException: For input string: "abc"
 
 **因此，在catch中抛出异常，不会影响finally的执行。JVM会先执行finally，然后抛出异常。**
 
----
-## 在finally抛出异常
+## 在finally抛出异常：异常屏蔽
 
 如果在执行finally语句时抛出异常，那么，`catch`语句的异常还能否继续抛出？例如
 ```java
@@ -218,9 +216,8 @@ Exception in thread "main" java.lang.IllegalArgumentException
 
 `catch`中抛出的异常去哪儿了？？
 
-这个异常被**屏蔽**了（Suppressed Exception）
+这个异常被**屏蔽**了（Suppressed Exception）：为了让他显示出来，我们可以使用一个实例将异常存起来，最后调用`addSuppressed()`方法
 
-为了让他显示出来，我们可以使用一个实例将异常存起来，最后调用`addSuppressed()`方法
 ```java
 public class Main {
     public static void main(String[] args) throws Exception {
@@ -234,6 +231,7 @@ public class Main {
             Exception e = new IllegalArgumentException();
             if (origin != null) {
                 e.addSuppressed(origin);
+                // 如果origin异常存在，那么就带上这个异常
             }
             throw e;
         }
@@ -254,6 +252,15 @@ Suppressed: java.lang.NumberFormatException: For input string: "abc"
 发现`Suppressed:`后面包含了被屏蔽的异常
 
 绝大多数情况下，在`finally`中不要抛出异常。因此，我们通常不需要关心`Suppressed Exception`。
+
+## 总结
+
+本节我们可以总结的规则如下：
+
+- `printStackTrace()`方法可以打印异常栈信息，打印的顺序是从内到外的（因为方法的调用是入栈）
+- 如果`catch`代码块抛出了新的异常，尽量把旧的异常作为参数传入新的异常，这样可以避免异常转换，导致追踪不到原始的报错位置
+- 如果`catch`代码块出现异常，依然会先执行`finally`代码块
+- 如果finally中抛出异常，那么catch抛出的异常将不再理会，因此如果finally要抛出异常，最好使用`addSuppressed()`
 
 
 

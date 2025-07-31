@@ -4,12 +4,12 @@ date: 2019-08-31 11:22:07
 tags: 
 - MySQL
 categories: 
-- 后台
 - MySQL
 ---
 
 <center>
-引言：
+	引言：
+
 
 SQL的继续学习
 
@@ -51,7 +51,8 @@ limit 分页
     FROM 
 			stu;  -- 学生表
     ```
-2. 去除重复
+    
+2. 去除重复（如果结果有多个NULL值，并不会合并为一个）
     ```sql
     SELECT DISTINCT sex FROM stu;
     # 加一个DISTINCT关键字即可
@@ -65,6 +66,7 @@ limit 分页
     SELECT sex,id + age FROM stu;
     # 如果有NULL数据就要使用IFNULL来吧NULL变为0
     ```
+    
 4. 起别名
 
     ```sql
@@ -72,19 +74,21 @@ limit 分页
     # 别名可以起名为中文，但是不推荐
     # AS 可以不写， 用空格来替代
     ```
+
+
+
 ### 条件查询
+
 SQL的运算符：
-`>` `<` `<=` `>=` `= ` `<>或!=`(不等于)
 
-`BETWEEN ... AND`
+- `>` `<` `<=` `>=` `= ` `<>或!=`(不等于)
+- `BETWEEN ... AND`
+- `IN` 
+- `LIKE`模糊查询
 
-`IN` 
+- `IS NULL`
 
-`LIKE`模糊查询
-
-`IS NULL`
-
-`and 或 &&` `or 或 ||` `not 或 |`
+- `and 或 &&` `or 或 ||` `not 或 |`
 
 语法
 ```

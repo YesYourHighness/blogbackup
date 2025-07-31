@@ -44,7 +44,7 @@ HashMap不能再多线程下使用，在JDK1.7版本，HashMap使用**头插法*
 
 ​	虽然HashTable也是线程安全的，但是它的内部实现是用`synchronized`，效率太低了
 
-#### 4、为什么不使用`Collections.synchronizedMap`
+### 4、为什么不使用`Collections.synchronizedMap`
 
 ​	其内部是一个普通的Map＋排斥锁，排斥锁可以自己给，内部也有自己的Obejct作为排斥锁
 
@@ -57,13 +57,30 @@ HashMap不能再多线程下使用，在JDK1.7版本，HashMap使用**头插法*
 - 为什么设置容量为2的幂次：
   1. 方便计算找下标
   2. 加快扩容时转移数据的速度
-- CAS的多次使用，避免加锁
+- ConcurrentHashMap可以保证高并发的原理
+  - JDK1.7 分段锁：segments+HashEntry
+    - segment是一个ReentrantLock，每个segment对应第一个HashEntry
+    - HashEntry就是普通的数组+链表的map（1.7也没有红黑树）
+
+  - JDK1.8 ：CAS+syn
+    - CAS：如果数据放在了数组上（即，数据还没拉链出来），就可以直接CAS判断放置
+    - `Synchronized`：如果数据要添加在链表或是树上，就需要syn同步
+    - 检索操作不用加锁，get方法是非阻塞的
+
+
+- ConcurrentHashMap的key和value都不允许为null
+- ConcurrentHashMap如何进行快速扩容？
+  - 并发扩容，最少每一个线程需要搬运16个桶
+  - 搬运时巧妙的计算下标index，只需要看1bit
+    - 比如从16位扩展到32bit，原本的下标计算方式是`hash&(n-1)`，即原本的hash与15计算，即低4bit，而32-1就是31，就是最低5bit，所以我们只需要看多出来的那一个bit
+
+
 
 ## ConcurrentHashMap基本了解
 
 ConcurrentHashMap也是**数组加链表**，在JDK1.7与1.8的实现稍有不同：
 
-### JDK1.7中的ConcurrentHashMap
+## JDK1.7中的ConcurrentHashMap
 
 实现如下：
 
@@ -185,7 +202,7 @@ put高并发总结：
 
 `get`方法更加简单，直接定位到`segment`再一步定位元素即可（因为有`volatile`保证可见性）
 
-### JDk1.8中的ConcurrentHashMap
+## JDk1.8中的ConcurrentHashMap
 
 以上的讨论，都是在JDK1.7时，这个版本HashMap有的问题它也都有
 
@@ -193,7 +210,10 @@ put高并发总结：
 
 一句话：**JDK1.8抛弃了原有的 Segment 分段锁，而采用了 `CAS + synchronized` 来保证并发安全性。**（数据结构方面也加入了红黑树）
 
-## 各数据的来源依据
+- CAS：如果数据放在了数组上（即，数据还没拉链出来），就可以直接CAS判断放置
+- `Synchronized`：如果数据要添加在链表或是树上，就需要syn同步
+
+### 各数据的来源依据
 
 ```java
 private static final int DEFAULT_CAPACITY = 16;
@@ -256,7 +276,7 @@ public ConcurrentHashMap(int initialCapacity) {
 
 所以要知道，**我们给的容量并不是实际的容量**
 
-## 初始化&sizeCtl变量
+### 初始化&sizeCtl变量
 
 和HashMap一样，ConcurrentHashMap的初始化方法并不在构造方法内，而是放在了第一次`put`方法中
 
@@ -346,7 +366,7 @@ private final Node<K,V>[] initTable() {
 }
 ```
 
-## `put()`方法
+### `put()`方法
 
 put方法很长，我们将分解的进行对`put()`方法的探究：
 
@@ -411,7 +431,7 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
 }
 ```
 
-## `addCount()`方法
+### `addCount()`方法
 
 `addCount`中其实并没有进行扩容，而是主要进行了扩容的判断（与扩容阈值`sizeCtl`进行判断）
 
@@ -442,7 +462,7 @@ private final void addCount(long x, int check) {
 }
 ```
 
-## `transfer()`方法
+### `transfer()`方法
 
 我们知道，在Java中没有动态数组，所谓的动态数组，都是在达到一定程度，进行了几步操作，才实现的
 
@@ -456,12 +476,10 @@ private final void addCount(long x, int check) {
 这里Java的操作十分巧妙
 
 ```text
-假设有数据为：
-1110 0011 
-//原数据与 16-1 进行与运算，即末尾4位
+假设有数据为：1110 0011 
+// 原数据与 16-1 进行与运算，即得到末尾4位
 现在扩容到了32位，就是要与末尾5位进行比较
-但是我们不需要再这样操作了
-只需要看倒数第五位即可！
+但是我们不需要再这样操作了，只需要看倒数第五位即可！
 如果倒数第五位为0：说明与原数组下标相同
 如果为1：只需要将0001 0000加上原数组位置即可
 ```

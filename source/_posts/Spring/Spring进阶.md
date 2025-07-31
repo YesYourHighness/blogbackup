@@ -7,8 +7,6 @@ tags:
 - Spring三级缓存
 categories:
 - Spring
-
-
 ---
 
 <center>
@@ -452,6 +450,202 @@ protected void addSingletonFactory(String beanName, ObjectFactory<?> singletonFa
 - 观察者模式：listener、event
 - 适配器模式：Adapter
 - 责任链模式：使用aop会生成一个拦截器链
+
+# Spring事务
+
+## Spring事务的实现方式
+
+当我们使用Spring来支持事务时，多半是由于数据库不支持事务（Mysql的Innodb是支持事务的）
+
+Spring支持两种方式实现事务：
+
+- 编程式事务：通过 `TransactionTemplate`或者`TransactionManager`手动管理事务，实际应用中很少使用
+- 声明式事务：通过AOP实现，比如`@Transactional`
+
+### 编程式事务
+
+TransactionTemplate
+
+```java
+@Autowired
+private TransactionTemplate transactionTemplate;
+
+public void testTransaction() {
+        transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+            @Override
+            protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
+                try {
+                    // ....  业务代码
+                } catch (Exception e){
+                    //回滚
+                    transactionStatus.setRollbackOnly();
+                }
+            }
+        });
+}
+```
+
+TransactionManager
+
+```java
+@Autowired
+private PlatformTransactionManager transactionManager;
+
+public void testTransaction() {
+
+  TransactionStatus status = transactionManager.getTransaction(new DefaultTransactionDefinition());
+          try {
+               // ....  业务代码
+              transactionManager.commit(status);
+          } catch (Exception e) {
+              transactionManager.rollback(status);
+          }
+}
+```
+
+### 声明式事务
+
+使用注解`@Transactional`
+
+- 方法：推荐将注解使用于方法上，不过需要注意的是：**该注解只能应用到 public 方法上，否则不生效。**
+- 类：如果这个注解使用在类上的话，表明该注解对该类中所有的 public 方法都生效。
+
+| 属性名      | 说明                                                         |
+| :---------- | :----------------------------------------------------------- |
+| propagation | 事务的传播行为，默认值为 REQUIRED，可选的值在上面介绍过      |
+| isolation   | 事务的隔离级别，默认值采用 DEFAULT，可选的值在上面介绍过     |
+| timeout     | 事务的超时时间，默认值为-1（不会超时）。如果超过该时间限制但事务还没有完成，则自动回滚事务。 |
+| readOnly    | 指定事务是否为只读事务，默认值为 false。                     |
+| rollbackFor | 用于指定能够触发事务回滚的异常类型，并且可以指定多个异常类型。 |
+
+> @Transaction是如何实现的？
+
+通过AOP，
+
+如果一个类或者一个类中的 public 方法上被标注`@Transactional` 注解的话，**Spring 容器就会在启动的时候为其创建一个代理类**，在调用被`@Transactional` 注解的 public 方法的时候，实际调用的是，`TransactionInterceptor` 类中的 `invoke()`方法。这个方法的作用就是在目标方法之前开启事务，方法执行过程中如果遇到异常的时候回滚事务，方法调用完成之后提交事务
+
+### 自调用问题
+
+```java
+@Service
+public class MyService {
+
+private void method1() {
+     method2();
+     //......
+}
+@Transactional
+ public void method2() {
+     //......
+  }
+}
+
+```
+
+使用注意：如果事务方法与调用方法处于同一个类，事务会失效，比如上面的代码。
+
+原因是因为：**代理对象的判断逻辑是其他类的方法调用时会产生事务，本类的调用逻辑则不会**
+
+为了解决自调用问题，可以：
+
+- 避免同一类中自调用
+- 使用 AspectJ 取代 Spring AOP 代理
+
+
+
+### Spring实现事务的关键接口
+
+Spring的事务实现方式，遵守了TCC（Try、Commit、Cancel）的方式：
+
+- `PlatformTransactionManager`：（平台）**事务管理器**（TCC规定了事务管理器和资源管理器），是事务运行机制的管理者，是一个接口，为JDBC、JPA、Hibernate等等提供了事务管理的接口，具体还需要各自实现。
+
+```java
+public interface PlatformTransactionManager {
+    //获得事务
+    TransactionStatus getTransaction(@Nullable TransactionDefinition var1) throws TransactionException;
+    //提交事务
+    void commit(TransactionStatus var1) throws TransactionException;
+    //回滚事务
+    void rollback(TransactionStatus var1) throws TransactionException;
+}
+```
+
+- `TransactionDefinition`：定义事务的信息，比如**传播方式、隔离级别**
+
+- `TransactionStatus`：事务运行状态。
+
+### 事务传播
+
+在 Spring 框架中，事务传播（transaction propagation）**定义了当一个事务方法被另一个事务方法调用时，事务的行为方式**。
+
+```java
+@Transactional(propagation = Propagation.REQUIRED)
+public void methodA() {
+    // some logic
+    serviceB.methodB();
+    // some logic
+}
+```
+
+有七种传播方式，他们总体来说定义了在原本有事务时，是选择加入、创建新事物、创建嵌套事物、还是报错；在原本没有事务时，是选择新建事务，还是直接以非事务的方式执行。
+
+- **REQUIRED**：（**默认**）
+  - **存在事务：加入**
+  - 不存在事务：新建
+- **REQUIRES_NEW**：
+  - 存在事务：新建（原有的事务会被挂起，直到新事务完成）两个事务之间互不干扰，各自回滚各自的，但是如果事务抛出了异常且没有捕获，可能会导致两个事务都回滚
+  - 不存在事务：新建
+- **NESTED**：
+- 存在事务：创建一个**嵌套事务**。（外部事物失败，内部也会回滚；内部事务失败，外部无影响）
+
+- 不存在事务：新建。
+- **SUPPORTS**：
+  - 存在事务：加入
+  - 不存在事务：以非事务方式执行
+- **NOT_SUPPORTED**：
+  - 存在事务：挂起原事务，以非事务执行
+  - 不存在事务：以非事务执行
+- **MANDATORY**：
+  - 存在事务：加入
+  - 不存在事务：抛出异常。
+- **NEVER**：
+  - 存在事务：抛出异常
+  - 不存在事务：非事务方式执行
+
+### 隔离级别
+
+RU、RC、RR、Serial
+
+```java
+public interface TransactionDefinition {
+    ......
+    int ISOLATION_DEFAULT = -1; // 默认方式会使用对应数据库的默认方式，比如mysql RR、oracle RC
+    int ISOLATION_READ_UNCOMMITTED = 1;
+    int ISOLATION_READ_COMMITTED = 2;
+    int ISOLATION_REPEATABLE_READ = 4;
+    int ISOLATION_SERIALIZABLE = 8;
+    ......
+}
+```
+
+### 事务只读
+
+```java
+public interface TransactionDefinition {
+    ......
+    // 返回是否为只读事务，默认值为 false
+    boolean isReadOnly();
+}
+```
+
+事务只读属性，如果设置为true，表面当前事务只会涉及到一些查询操作
+
+> 有什么作用？在开启后，数据库会有一些优化手段
+
+比如mysql每个连接默认都是autocommit的，每一个sql语句都会开启一个事务，如果不开启事务去执行，那么每次都读取的是最新值，但是如果涉及到一些批量查询，可能就需要前后一致性，就可以开启事务，保证多个sql在一个事物内执行！
+
+- 对于一次性执行单条查询语句来说，没必要开启
+- 对于一次性执行多条查询语句，**例如统计查询，报表查询**，在这种场景下，多条查询 SQL 必须保证整体的读一致性，否则，在前条 SQL 查询之后，后条 SQL 查询之前，数据被其他用户改变，则该次整体的统计查询将会出现读数据不一致的状态，此时，应该启用事务支持
 
 # 相关链接
 
